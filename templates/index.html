@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Meeting Scheduler KMR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .time-slot {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 40px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+        }
+        .time-box {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .best-time-box {
+            background-color: #FF5733;  /* 최적 시간은 빨간색으로 하이라이트 */
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 시간 5개 컬럼으로 표시 */
+            gap: 5px;
+            margin-top: 20px;
+        }
+        .grid-item {
+            height: 40px;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+        .grid-item-header {
+            background-color: #d3d3d3;
+            font-weight: bold;
+        }
+        .time-selection-box {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <div class="max-w-4xl mx-auto py-8">
+        <h1 class="text-3xl font-semibold text-center mb-6">Meeting Scheduler</h1>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h3 class="text-xl font-medium mb-4">Select your available times:</h3>
+            
+            <div id="timeGrid" class="grid grid-cols-5 gap-2 mb-6"></div> 
+
+            <h3 class="text-lg font-medium mb-2">Selected available times:</h3>
+            <ul id="selectedTimesList" class="list-disc pl-6 mb-6"></ul>
+
+            <h3 class="text-lg font-medium mb-2">Enter your name:</h3>
+            <input type="text" id="userName" class="border border-gray-300 rounded-lg p-2 w-full" placeholder="Enter your name">
+
+            <button onclick="submitAvailability()" class="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 mt-4">Submit Availability</button>
+            <button onclick="optimizeMeeting()" class="bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 mt-4">Find Best Time</button>
+
+            <h3 class="text-lg font-medium mt-6">Users and their selected times:</h3>
+            <ul id="userTimesList" class="list-disc pl-6 mb-6"></ul>
+
+            <h3 class="text-lg font-medium mt-6">Best meeting time:</h3>
+            <ul id="bestTimeList" class="list-disc pl-6"></ul> 
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto py-8">
+        <h3 class="text-xl font-medium mb-4">Selected Time Boxes:</h3>
+        <div id="timeSelectionBox" class="time-selection-box"></div>
+    </div>
+
+    <script>
+        let selectedTimes = [];
+        let userTimes = {};
+        let isSelecting = false;
+        let startTime = null;
+        const timeSlots = [];
+
+        // create time slots every 30 minutes from 9:00 to 18:00
+        for (let h = 9; h <= 18; h++) {
+            for (let m of ["00", "30"]) {
+                if (h === 18 && m === "30") continue;
+                timeSlots.push(`${String(h).padStart(2, '0')}:${m}`);
+            }
+        }
+
+        const grid = document.getElementById("timeGrid");
+        timeSlots.forEach(time => {
+            let div = document.createElement("div");
+            div.className = "time-slot bg-gray-200 p-2 text-center rounded-lg cursor-pointer hover:bg-blue-200 transition";
+            div.innerText = time;
+            div.dataset.time = time;
+            div.addEventListener("mousedown", selectStart);
+            div.addEventListener("mouseover", selectRange);
+            div.addEventListener("mouseup", selectEnd);
+            grid.appendChild(div);
+        });
+
+        document.addEventListener("mouseup", () => isSelecting = false);
+
+        function selectStart(event) {
+            isSelecting = true;
+            startTime = event.target.dataset.time;
+            toggleSelection(event.target);
+        }
+
+        function selectRange(event) {
+            if (isSelecting) {
+                toggleSelection(event.target);
+            }
+        }
+
+        function selectEnd(event) {
+            isSelecting = false;
+            updateSelectedTimes();
+        }
+
+        function toggleSelection(element) {
+            let time = element.dataset.time;
+            if (selectedTimes.includes(time)) {
+                selectedTimes = selectedTimes.filter(t => t !== time);
+                element.classList.remove("bg-blue-500", "text-white");
+            } else {
+                selectedTimes.push(time);
+                element.classList.add("bg-blue-500", "text-white");
+            }
+        }
+
+        function updateSelectedTimes() {
+            const selectedList = document.getElementById("selectedTimesList");
+            selectedList.innerHTML = "";
+            selectedTimes.sort();
+            let mergedTimes = mergeTimeRanges(selectedTimes);
+            mergedTimes.forEach(range => {
+                let li = document.createElement("li");
+                li.textContent = range;
+                selectedList.appendChild(li);
+            });
+
+            // Update the selected time boxes at the bottom
+            updateTimeSelectionBoxes();
+        }
+
+        function mergeTimeRanges(times) {
+            if (times.length === 0) return [];
+
+            times.sort();
+            let result = [];
+            let start = times[0];
+            let prev = start;
+
+            for (let i = 1; i < times.length; i++) {
+                let [prevHour, prevMin] = prev.split(":").map(Number);
+                let [currHour, currMin] = times[i].split(":").map(Number);
+                let prevTotal = prevHour * 60 + prevMin;
+                let currTotal = currHour * 60 + currMin;
+
+                if (currTotal - prevTotal > 30) {
+                    result.push(`${start} - ${prev}`);
+                    start = times[i];
+                }
+                prev = times[i];
+            }
+            result.push(`${start} - ${prev}`);
+            return result;
+        }
+
+        function submitAvailability() {
+            const userName = document.getElementById("userName").value;
+            if (!userName) {
+                alert("User name is required!");
+                return;
+            }
+        
+            if (selectedTimes.length === 0) {
+                alert("Please select at least one time slot.");
+                return;
+            }
+        
+            userTimes[userName] = selectedTimes;
+            selectedTimes = [];
+            updateSelectedTimes();
+            showUserTimes();
+        
+            alert(`${userName}'s availability saved!`);
+        
+            // transfer user availability to the server
+            fetch('/submit', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user: userName,
+                    available_times: userTimes[userName]
+                })
+            })
+            .then(response => response.json())
+            .then(data => console.log(data.message))
+            .catch(error => console.error('Error:', error));
+        
+            resetTimeSelection();
+        }
+        
+
+        // show user availability
+        function showUserTimes() {
+            const userTimesList = document.getElementById("userTimesList");
+            userTimesList.innerHTML = "";
+            for (const user in userTimes) {
+                let li = document.createElement("li");
+                li.textContent = `${user}: ${userTimes[user].join(", ")}`;
+                userTimesList.appendChild(li);
+            }
+        }
+
+        // reset time selection
+        function resetTimeSelection() {
+            const timeSlots = document.querySelectorAll('.time-slot');
+            timeSlots.forEach(slot => {
+                slot.classList.remove('bg-blue-500', 'text-white');
+            });
+        }
+
+        function optimizeMeeting() {
+            fetch('/optimize', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ users: userTimes })
+            })
+            .then(response => response.json())
+            .then(data => showBestTime(data.best_time))
+            .catch(error => console.error('Error:', error));
+        }
+        
+
+        function showBestTime(bestTime) {
+            const bestTimeList = document.getElementById("bestTimeList");
+            bestTimeList.innerHTML = "";
+        
+            if (bestTime.length === 0) {
+                let li = document.createElement("li");
+                li.textContent = "No common time found";
+                bestTimeList.appendChild(li);
+            } else {
+                bestTime.forEach(time => {
+                    let li = document.createElement("li");
+                    li.textContent = time;
+                    bestTimeList.appendChild(li);
+                });
+            }
+        }
+
+        // Update the selected time boxes at the bottom
+        function updateTimeSelectionBoxes() {
+            const timeSelectionBox = document.getElementById("timeSelectionBox");
+            timeSelectionBox.innerHTML = "";  // init
+            selectedTimes.forEach(time => {
+                const box = document.createElement("div");
+                box.classList.add("bg-green-500", "text-white", "p-2", "rounded-lg", "mb-2");
+                box.textContent = time;
+                timeSelectionBox.appendChild(box);
+            });
+        }
+    </script>
+</body>
+</html>

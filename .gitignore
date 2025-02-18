@@ -1,0 +1,21 @@
+# Python-related
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Environment files
+venv/
+.env
+
+# Database files
+instance/
+meetings.db
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
