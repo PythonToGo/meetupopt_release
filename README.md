@@ -65,6 +65,3 @@ Deploy using Vercel. Ensure the following files are set up:
 ## License
 
 MIT License.
-
-
-This version focuses on the essentials while leaving out more detailed instructions.
