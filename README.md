@@ -1,6 +1,10 @@
 # Meeting Scheduler
 
 A simple web app built with **Flask** and **SQLite** for scheduling meetings by finding common available times among participants.
+(-> now transfering to PostgreSQL )
+(-> deploy with vercel : not yet)
+
+![Meeting Scheduler Screenshot](img.png)
 
 ## Features
 
