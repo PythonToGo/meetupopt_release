@@ -51,5 +51,12 @@ def optimize_meeting():
 
     return jsonify({"best_time": list(common_times)})
 
+
+# Vercel version
+def handler(event, context):
+    return app(event, context)
+
+
+# Local version
 if __name__ == '__main__':
     app.run(debug=False)
